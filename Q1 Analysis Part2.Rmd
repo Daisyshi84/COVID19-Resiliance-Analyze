@@ -1,0 +1,182 @@
+---
+title: "Q1 Analysis Part 2"
+author: "Daisy Shi"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+params:
+  include_titles: TRUE
+  full_sample: FALSE
+  unvax: TRUE
+  config: "configs/gmt3_config.R"
+output:
+  powerpoint_presentation:
+    reference_doc: Tanaq_Covid_Template20.pptx
+  html_document:
+    theme: united
+    number_sections: true
+    toc: true
+    toc_depth: 2
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    df_print: paged
+    code_folding: show
+    keep_md: no
+---
+ 
+ 
+## Penalized Logistic Regression
+When we have multiple variables in logistic regression model, it might be useful to find a reduced set of variables resulting to an optimal performing model.
+
+Penalized logistic regression imposes a penalty to the logistic model for having too many variables. This results in shrinking the coefficients of the less contributive variables toward zero. This is also known as regularization.
+
+The most commonly used penalized regression include:
+
+*   Ridge regression: variables with minor contribution have their coefficients close to zero. However, all the variables are incorporated in the model. This is useful when all variables need to be incorporated in the model according to domain knowledge.
+*   Lasso regression: the coefficients of some less contributive variables are forced to be exactly zero. Only the most significant variables are kept in the final model.
+**results indicates all of the predictors are contribute similar information to the model. Hence, we can not reduce the variables, which implies with the PCA analysis results.**
+
+
+## Multivariate analysis of barrier___9
+
+```{r, message=FALSE, results="asis",echo=FALSE,warning=FALSE}
+library(readxl)
+library(dplyr)
+library(tidyverse)
+library(gtsummary)
+library(gmodels)
+library(readxl)
+library(psych)
+library(corrplot)
+library(ggfortify)
+library(ggplot2)
+
+data1 <-read_excel("\\\\cdc.gov\\locker\\CPR_RMOI\\Response Activities\\2019 nCoV\\Evaluation Team\\Dashboard\\Data Output\\main_data_dashboard_MostUpdated.xlsx")
+data<- data1 %>%
+    filter(main_module_complete==2) %>%
+    select(starts_with(c("constraints","barrier","stress")),"depagain_covid","tl05", "appreciated","team02","team01","during03","during06", "personksa","onboard02","workgoals","jobprep","workhour","breaks","workhealth","stress_overall","surveytaken","adminleave___1","DepLength")%>%
+    select(!ends_with(c(".factor","other")),-"constraints___9",-"barrier___10",-"barrier___11")%>%
+    mutate(
+    workstress=ifelse(stress01 %in% c(3,4), 1, 0),
+    workstress=ifelse(stress02 %in% c(3,4), 1, 0),
+    workstress=ifelse(stress03 %in% c(3,4), 1, 0),
+    workstress=ifelse(stress04 %in% c(3,4), 1, 0),
+    lifestress=ifelse(stress05 %in% c(3,4), 1, 0),
+    lifestress=ifelse(stress06 %in% c(3,4), 1, 0),
+    lifestress=ifelse(stress07 %in% c(3,4), 1, 0),
+    lifestress=ifelse(stress08 %in% c(3,4), 1, 0))
+
+ 
+
+
+constraints<- data %>% select(starts_with("constraints"))
+stress<- data %>% select(starts_with("stress"))%>% select(-"stress_overall")
+barrier<- data %>% select(starts_with("barrier"))
+
+library(ltm) 
+library(corrplot)
+
+library(glmnet)
+data[is.na(data)]<- 0
+corr<-round(as.table(cor(data)),2) 
+
+# write.xlsx(corr,file ="C:\\Users\\SSE6\\Desktop\\corr.xlsx")
+ 
+# Split the data into training and test set
+set.seed(123)
+training.samples <- sample(nrow(data),nrow(data)*0.5)
+train.data  <- data[training.samples, ]
+test.data <- data[-training.samples, ]
+ 
+ #define response variable
+y <- train.data$barrier___9
+# names(train.data)
+
+#define matrix of predictor variables
+x <- data.matrix(train.data[, c('constraints___1', 'constraints___2', 'constraints___3', 'constraints___4','tl05','personksa','onboard02','stress01')])
+
+# x <- data.matrix(train.data[, c('tl05','personksa','onboard02','DepLength')])
+# 
+
+#  
+# x <- model.matrix(barrier___9 ~ . , train.data)[,-1]
+# y <-  train.data$barrier___9 
+
+ 
+#Fit the lasso penalized regression model:
+cv.lasso <- cv.glmnet(x, y, alpha = 1, family = "binomial")
+ 
+# Fit the final model on the training data
+model.lasso <- glmnet(x, y, alpha = 1, family = "binomial",
+                lambda = cv.lasso$lambda.min)
+# Display regression coefficients
+coef.l<-coef(model.lasso)
+#fit ridge regression model
+cv.ridge <- cv.glmnet(x, y, alpha = 0, family = "binomial")
+model.r <- glmnet(x, y, alpha = 0, family = "binomial",
+                lambda = cv.ridge$lambda.min)
+# Display regression coefficients
+coef.f<-coef(model.r)
+
+
+
+full.model<- glm(barrier___9 ~., train.data,family = binomial)
+summary(full.model)
+
+stepAIC(full.model)
+# Step:  AIC=134.23
+# barrier___9 ~ constraints___2 + constraints___4 + constraints___5 + 
+#     constraints___7 + barrier___1 + barrier___2 + barrier___4 + 
+#     barrier___5 + barrier___7 + depagain_covid + tl05 + team02 + 
+#     during06 + personksa + workgoals + jobprep + breaks + workhealth + 
+#     adminleave___1 + DepLength
+
+model1<- glm(formula = barrier___9 ~ constraints___2 + constraints___5+ 
+    constraints___7 + barrier___4 + barrier___7 + stress_overall + 
+    stress01 + stress03 + stress06 + depagain_covid + appreciated + 
+    team02 + workgoals + workhealth + surveytaken + DepLength + 
+    lifestress, family = binomial, data = train.data)
+summary(model1)
+anova(full.model,model1, test='LR')
+
+
+
+```
+
+## Bivariate analysis of barrier___9
+
+
+```{r, message=FALSE, results = TRUE,echo=FALSE,warning=FALSE}
+iv<- data[,-data$barrier___9]
+for(i in names(iv)) {
+  mod_summary <- summary(glm(barrier___9 ~  data[[i]], data = data,family = binomial)) 
+  bivar_p_value<- coef(mod_summary)[8]
+  if (bivar_p_value <= 0.05) {
+    cat(paste(i,":bivar_p_value is significant ***",  round(bivar_p_value,3), "\n\n"))
+  }else{
+    cat(paste(i,":bivar_p_value is not significant" ,  round(bivar_p_value,3),"\n\n"))
+  } 
+}
+
+
+```
+
+
+## Bivariate analysis of barrier___3
+
+```{r, message=FALSE, results = TRUE,echo=FALSE,warning=FALSE}
+
+iv2<- data[,-data$barrier___3]
+
+for(i in names(iv2)) {
+  mod_summary <- summary(glm(barrier___3 ~  data[[i]], data = data,family = binomial)) 
+  bivar_p_value<- coef(mod_summary)[8]
+  if (bivar_p_value <= 0.05) {
+    cat(paste(i,":bivar_p_value is significant ***",  round(bivar_p_value,3), "\n\n"))
+  }else{
+    cat(paste(i,":bivar_p_value is not significant" ,  round(bivar_p_value,3),"\n\n"))
+  } 
+}
+
+
+
+```

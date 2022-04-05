@@ -1,0 +1,283 @@
+---
+title: "Q1 Analysis"
+author: "Daisy Shi"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+params:
+  include_titles: TRUE
+  full_sample: FALSE
+  unvax: TRUE
+  config: "configs/gmt3_config.R"
+output:
+  powerpoint_presentation:
+    reference_doc: Tanaq_Covid_Template20.pptx
+  html_document:
+    theme: united
+    number_sections: true
+    toc: true
+    toc_depth: 2
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    df_print: paged
+    code_folding: show
+    keep_md: no
+---
+ 
+
+```{r, message=FALSE, results="asis",echo=FALSE,warning=FALSE}
+
+message(
+  "Parameters: include_titles = ", params$include_titles, 
+  " unvax = ", params$unvax,
+  " full_sample = ", params$full_sample,
+  echo=F
+  )
+knitr::opts_chunk$set(echo = FALSE)
+fig_width_scale = 10
+knitr::opts_chunk$set(
+  echo = FALSE,
+  fig.width=fig_width_scale,
+  fig.showtext = TRUE,
+  fit_retina = 1
+  )
+include_titles <- params$include_titles
+config_file <- params$config
+message(paste0("config filename is ", config_file), echo=FALSE)
+# #source('read_excel.R')
+# source("function.R")
+# source('polr_convenience.R')
+
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+knitr::opts_chunk$set(echo = FALSE)
+fig_width_scale = 10
+knitr::opts_chunk$set(
+  echo = FALSE,
+  fig.width=fig_width_scale,
+  fig.showtext = TRUE,
+  fit_retina = 1
+  )
+# dataa<- dataa %>%filter(main_module_complete==2) 
+# plot_title<- ggtitle("Figure 1", 
+#                      "Density plots for all attributes")
+# a<-ggplot(dataa,aes(barrier___1 ,fill=extend.factor))+  geom_density(alpha = 0.3,adjust = 5) 
+# b<-ggplot(dataa,aes(barrier___2,fill=extend.factor))+  geom_density(alpha = 0.3,adjust = 5) 
+# c<-ggplot(dataa,aes(barrier___3,fill=extend.factor))+  geom_density(alpha = 0.3,adjust = 5) 
+# d<-ggplot(dataa,aes(barrier___4,fill=extend.factor))+  geom_density(alpha = 0.3,adjust = 5) 
+# e<-ggplot(dataa,aes(barrier___5,fill=extend.factor))+  geom_density(alpha = 0.3,adjust = 5) 
+# f<-ggplot(dataa,aes(barrier___6,fill=extend.factor))+  geom_density(alpha = 0.3,adjust = 5) 
+# g<-ggplot(dataa,aes(barrier___7,fill=extend.factor))+  geom_density(alpha = 0.3,adjust = 5) 
+# h<-ggplot(dataa,aes(barrier___8,fill=extend.factor))+  geom_density(alpha = 0.3,adjust = 5) 
+# i<-ggplot(dataa,aes(barrier___9,fill=extend.factor))+  geom_density(alpha = 0.3,adjust = 5)
+# j<-ggplot(dataa,aes(barrier___10,fill=extend.factor))+  geom_density(alpha = 0.3,adjust = 5)
+# MULTI<-multiplot(a,b,c,d,e,f,g,h,i,j,cols=2)
+# yes_no_qs<- NA
+# activation_qs<-NA
+
+```
+##  Introduction & Exploratory Data Analysis
+
+* We will first examine the frequency of responses by Exploratory data analysis. Further more, to investigate how the correlations between the items. And principal components are used to visualize and determine if Multi-dimensional or Uni-Dimensional approach shall be 
+implemented in this analysis. And the scree plot which uses a plot of successive eigen vectors.
+Additionally to access the factor plot to understand the underlying structure of the dataset.
+
+```{r, message=FALSE, results="asis",echo=FALSE,warning=FALSE}
+library(readxl)
+library(tidyverse)
+library(fs)
+library(dplyr)
+library(tidyverse)
+library(lubridate)
+library(gtsummary)
+library(gmodels)
+library(writexl)
+library(readxl)
+library(openxlsx)
+library(psych)
+library(corrplot)
+library(ggfortify)
+library(ggplot2)
+
+data1 <-read_excel("\\\\cdc.gov\\locker\\CPR_RMOI\\Response Activities\\2019 nCoV\\Evaluation Team\\Dashboard\\Data Output\\main_data_dashboard_MostUpdated.xlsx")
+data<- data1 %>%
+    filter(main_module_complete==2)%>%
+    select(starts_with(c("constraints","barrier","stress")),"depagain_covid","tl05",
+         "appreciated","team02","team01","during03","during06","personksa",
+         "onboard02","workgoals","jobprep","workhour","breaks","workhealth",
+         "stress_overall","surveytaken","adminleave___1","DepLength")%>%
+    select(!ends_with(c(".factor","other")),-"constraints___9",-"barrier___10",-"barrier___11")%>%
+    mutate(
+    workstress=ifelse(stress01 %in% c(3,4), 1, 0),
+    workstress=ifelse(stress02 %in% c(3,4), 1, 0),
+    workstress=ifelse(stress03 %in% c(3,4), 1, 0),
+    workstress=ifelse(stress04 %in% c(3,4), 1, 0),
+    lifestress=ifelse(stress05 %in% c(3,4), 1, 0),
+    lifestress=ifelse(stress06 %in% c(3,4), 1, 0),
+    lifestress=ifelse(stress07 %in% c(3,4), 1, 0),
+    lifestress=ifelse(stress08 %in% c(3,4), 1, 0))
+
+ 
+
+to_plot <-  c("barrier___9","barrier___3","depagain_covid")
+
+for (q in to_plot) {
+  # message("plotting ", q, echo=F)
+  # cat(paste("Distribution for", q , "\n\n"))
+  temp <- data %>%
+    group_by(.data[[q]]) %>%
+    summarize(
+      n = n()
+    ) %>% ungroup() %>%
+    mutate(prop = n/sum(n))
+  temp[[q]] <- factor(temp[[q]])
+  g <- ggplot(temp, aes(x = .data[[q]], y = n, label = scales::percent(prop, accuracy=1L) )) +
+    geom_bar(stat="identity") +
+    geom_text(
+      position = position_stack(vjust = 0.5, reverse=TRUE),
+      size = fig_width_scale*.36, color='white'
+    ) +
+    ggtitle(paste("Distribution of dependent_variabless for", q))
+  print(g)
+  cat("\n\n")
+}
+ activation_qs<-NA
+```
+## Distribution of independent variables
+
+```{r}
+independent_variables<- names(data[!data %in% to_plot])
+for (q in independent_variables) {
+  # message("plotting ", q, echo=F)
+  # cat(paste("Distribution for", q , "\n\n"))
+  temp <- data %>%
+    group_by(.data[[q]]) %>%
+    summarize(
+      n = n()
+    ) %>% ungroup() %>%
+    mutate(prop = n/sum(n))
+  temp[[q]] <- factor(temp[[q]])
+  g <- ggplot(temp, aes(x = .data[[q]], y = n, label = scales::percent(prop, accuracy=1L) )) +
+    geom_bar(stat="identity") +
+    geom_text(
+      position = position_stack(vjust = 0.5, reverse=TRUE),
+      size = fig_width_scale*.36, color='white'
+    ) +
+    ggtitle(paste("Distribution of independent_variables", q))
+  print(g)
+  cat("\n\n")
+}
+```
+
+## Check underlying structure of the dataset
+```{r, message=FALSE, results="asis",echo=FALSE,warning=FALSE}
+constraints<- data %>% select(starts_with("constraints"))
+stress1<- data %>% select(starts_with("stress"))%>% select(-"stress_overall")
+stress<- data %>% select(starts_with("stress"))%>% select(-"stress_overall")
+barrier<- data %>% select(starts_with("barrier"))
+
+ 
+# scree(stress)
+# plot(omega(stress))
+# scree(constraints)
+# plot(omega(constraints))
+print(omega(data))
+par(mfrow=c(2,3))
+print(omega(constraints))
+print(omega(stress))
+print(omega(barrier))
+cat("\n\n")
+
+```
+
+
+## PCA interpretation 
+
+*   We can see that approximately 95% of the data is explained by the first principal component. 
+In other words, The first PC(PC1) contribute ~95% of the total variation in the dataset.
+    *   Variables contributing similar information are grouped together. (`constraints 1-8, barrier 1-9,stress overall,stress01-04`) are highly associated and forms cluster.
+
+```{r, message=FALSE, results = TRUE,echo=FALSE,warning=FALSE}
+library(ltm) 
+library(corrplot)
+library(psych)
+#To understand the frequency spread 
+# description <- descript(data)
+# data[is.na(data)]<- 0
+data_d<- data[!data %in% stress]
+data[is.na(data)]<-0
+#First let's look into the principal components to see if there is any exhbition of unidimensionality
+par(mfrow=c(1,1))
+pc <- prcomp(data)
+# summary(pc)
+autoplot(pc, data = data)
+ 
+```
+
+## Penalized Logistic Regression
+When we have multiple variables in logistic regression model, it might be useful to find a reduced set of variables resulting to an optimal performing model.
+
+Penalized logistic regression imposes a penalty to the logistic model for having too many variables. This results in shrinking the coefficients of the less contributive variables toward zero. This is also known as regularization.
+
+The most commonly used penalized regression include:
+
+*   Ridge regression: variables with minor contribution have their coefficients close to zero. However, all the variables are incorporated in the model. This is useful when all variables need to be incorporated in the model according to domain knowledge.
+*   Lasso regression: the coefficients of some less contributive variables are forced to be exactly zero. Only the most significant variables are kept in the final model.
+**results indicates all of the predictors are contribute similar information to the model. Hence, we can not reduce the variables, which implies with the PCA analysis results.**
+
+ 
+```{r, message=FALSE, results=TRUE,echo=FALSE,warning=FALSE}
+library(corrplot)
+library(caret)
+library(glmnet)
+corr<-round(as.table(cor(data)),2) 
+
+# Split the data into training and test set
+set.seed(123)
+training.samples <- data_d$barrier___9 %>% 
+  createDataPartition(p = 0.8, list = FALSE)
+train.data  <- data_d[training.samples, ]
+test.data <- data_d[-training.samples, ]
+ 
+ 
+ 
+x <- model.matrix(barrier___9 ~ . , train.data)[,-1]
+y <-  train.data$barrier___9[1:197]
+ 
+#Fit the lasso penalized regression model:
+cv.lasso <- cv.glmnet(x, y, alpha = 1, family = "binomial")
+ 
+# Fit the final model on the training data
+model.lasso <- glmnet(x, y, alpha = 1, family = "binomial",
+                lambda = cv.lasso$lambda.min)
+# Display regression coefficients
+coef.l<-coef(model.lasso)
+
+
+#fit ridge regression model
+cv.ridge <- cv.glmnet(x, y, alpha = 0, family = "binomial")
+model.r <- glmnet(x, y, alpha = 0, family = "binomial",
+                lambda = cv.ridge$lambda.min)
+# Display regression coefficients
+coef.f<-coef(model.r)
+
+
+
+full.model<- glm(barrier___9 ~., train.data,family = binomial)
+summary(full.model) 
+
+# stepAIC(full.model)
+# Step:  AIC=134.23
+# barrier___9 ~ constraints___2 + constraints___4 + constraints___5 + 
+#     constraints___7 + barrier___1 + barrier___2 + barrier___4 + 
+#     barrier___5 + barrier___7 + depagain_covid + tl05 + team02 + 
+#     during06 + personksa + workgoals + jobprep + breaks + workhealth + 
+#     adminleave___1 + DepLength
+
+model1<- glm(barrier___9 ~ constraints___2 + constraints___4 + constraints___5 + 
+    constraints___7 + barrier___1 + barrier___2 + barrier___4 +
+    barrier___5 + barrier___7 + depagain_covid + tl05 + team02 +
+    during06 + personksa + workgoals + jobprep + breaks + workhealth +
+    adminleave___1 + DepLength,train.data,family = binomial)
+summary(model1)
+anova(full.model,model1, test='LR')
